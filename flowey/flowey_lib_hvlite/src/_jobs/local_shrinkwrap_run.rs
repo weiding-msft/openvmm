@@ -12,13 +12,13 @@ flowey_request! {
         /// Output directory where shrinkwrap build artifacts are located
         pub out_dir: PathBuf,
         /// Directory where shrinkwrap repo is cloned
-        pub shrinkwrap_dir: PathBuf,
+        pub shrinkwrap_src_dir: PathBuf,
         /// Platform YAML file for shrinkwrap run
         pub platform_yaml: PathBuf,
         /// Path to rootfs.ext2 file
         pub rootfs_path: PathBuf,
         /// Runtime variables for shrinkwrap run (e.g., "ROOTFS=/path/to/rootfs.ext2")
-        pub rtvars: Vec<String>,
+        pub rtvars: Option<Vec<String>>,
         pub done: WriteVar<SideEffect>,
     }
 }
@@ -33,7 +33,7 @@ impl SimpleFlowNode for Node {
     fn process_request(request: Self::Request, ctx: &mut NodeCtx<'_>) -> anyhow::Result<()> {
         let Params {
             out_dir,
-            shrinkwrap_dir,
+            shrinkwrap_src_dir,
             platform_yaml,
             rootfs_path,
             rtvars,
@@ -45,8 +45,8 @@ impl SimpleFlowNode for Node {
             move |_rt| {
                 // Compute paths the same way as install job
                 // Get the parent directory (toolchain_dir) where everything is built
-                let toolchain_dir = shrinkwrap_dir.parent()
-                    .ok_or_else(|| anyhow::anyhow!("shrinkwrap_dir has no parent"))?;
+                let toolchain_dir = shrinkwrap_src_dir.parent()
+                    .ok_or_else(|| anyhow::anyhow!("shrinkwrap_src_dir has no parent"))?;
 
                 let tmk_kernel_dir = toolchain_dir.join("OpenVMM-TMK");
                 let host_kernel_dir = toolchain_dir.join("OHCL-Linux-Kernel");
@@ -205,8 +205,8 @@ impl SimpleFlowNode for Node {
                     .map_err(|e| anyhow::anyhow!("Failed to canonicalize rootfs path: {}", e))?;
 
                 // Prepare shrinkwrap command
-                let shrinkwrap_exe = shrinkwrap_dir.join("shrinkwrap").join("shrinkwrap");
-                let venv_dir = shrinkwrap_dir.join("venv");
+                let shrinkwrap_exe = shrinkwrap_src_dir.join("shrinkwrap").join("shrinkwrap");
+                let venv_dir = shrinkwrap_src_dir.join("venv");
 
                 if !shrinkwrap_exe.exists() {
                     anyhow::bail!("shrinkwrap executable not found at {}", shrinkwrap_exe.display());
@@ -235,8 +235,8 @@ impl SimpleFlowNode for Node {
                 rtvar_args.push("--rtvar".to_string());
                 rtvar_args.push(format!("ROOTFS={}", rootfs_canonical.display()));
 
-                // Add any additional rtvars from parameters
-                for rtvar in rtvars {
+                // Add additional rtvars if any
+                for rtvar in rtvars.unwrap_or_else(Vec::new) {
                     rtvar_args.push("--rtvar".to_string());
                     rtvar_args.push(rtvar);
                 }

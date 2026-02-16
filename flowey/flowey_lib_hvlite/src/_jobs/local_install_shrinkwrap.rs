@@ -33,7 +33,7 @@ const HYPERV_CONFIGS: &[&str] = &[
 flowey_request! {
     pub struct Params {
         /// Directory where shrinkwrap repo will be cloned (e.g. <out_dir>/shrinkwrap)
-        pub shrinkwrap_dir: PathBuf,
+        pub shrinkwrap_src_dir: PathBuf,
         /// If true, run apt-get and pip installs (requires sudo).
         /// If false, only clones repo and writes instructions.
         pub do_installs: bool,
@@ -132,7 +132,7 @@ impl SimpleFlowNode for Node {
 
     fn process_request(request: Self::Request, ctx: &mut NodeCtx<'_>) -> anyhow::Result<()> {
         let Params {
-            shrinkwrap_dir,
+            shrinkwrap_src_dir,
             do_installs,
             update_repo,
             done,
@@ -144,7 +144,7 @@ impl SimpleFlowNode for Node {
                 let sh = Shell::new()?;
 
                 // 0) Create parent dir
-                if let Some(parent) = shrinkwrap_dir.parent() {
+                if let Some(parent) = shrinkwrap_src_dir.parent() {
                     fs_err::create_dir_all(parent)?;
                 }
 
@@ -169,8 +169,8 @@ impl SimpleFlowNode for Node {
                 }
 
                 // 2) Download and extract ARM GNU toolchain for Host linux kernel compilation
-                let toolchain_dir = shrinkwrap_dir.parent()
-                    .ok_or_else(|| anyhow::anyhow!("shrinkwrap_dir has no parent"))?;
+                let toolchain_dir = shrinkwrap_src_dir.parent()
+                    .ok_or_else(|| anyhow::anyhow!("shrinkwrap_src_dir has no parent"))?;
                 let toolchain_archive = toolchain_dir.join("arm-gnu-toolchain-14.3.rel1-x86_64-aarch64-none-elf.tar.xz");
                 let toolchain_extracted_dir = toolchain_dir.join("arm-gnu-toolchain-14.3.rel1-x86_64-aarch64-none-elf");
 
@@ -301,7 +301,7 @@ impl SimpleFlowNode for Node {
                     )?;
 
                     // Return to parent directory
-                    sh.change_dir(shrinkwrap_dir.parent().unwrap());
+                    sh.change_dir(shrinkwrap_src_dir.parent().unwrap());
                 } else {
                     log::info!("Skipping TMK builds (do_installs=false). Run with --install-missing-deps to build.");
                 }
@@ -310,7 +310,7 @@ impl SimpleFlowNode for Node {
                 clone_or_update_repo(
                     &sh,
                     SHRINKWRAP_REPO,
-                    &shrinkwrap_dir,
+                    &shrinkwrap_src_dir,
                     update_repo,
                     None,
                     "Shrinkwrap",
@@ -330,7 +330,7 @@ impl SimpleFlowNode for Node {
                 // Copy planes.yaml to shrinkwrap config directory, cca-3world.yaml configuration does not bring
                 // in the right versions of all the components, this builds a planes-enabled stack
                 let planes_yaml_src = cca_config_dir.join("planes.yaml");
-                let shrinkwrap_config_dir = shrinkwrap_dir.join("config");
+                let shrinkwrap_config_dir = shrinkwrap_src_dir.join("config");
                 fs_err::create_dir_all(&shrinkwrap_config_dir)?;
                 let planes_yaml_dest = shrinkwrap_config_dir.join("planes.yaml");
 
@@ -344,7 +344,7 @@ impl SimpleFlowNode for Node {
                 }
 
                 // 6) Create Python virtual environment and install deps
-                let venv_dir = shrinkwrap_dir.join("venv");
+                let venv_dir = shrinkwrap_src_dir.join("venv");
                 if do_installs {
                     if !venv_dir.exists() {
                         log::info!("Creating Python virtual environment at {}", venv_dir.display());
@@ -358,7 +358,7 @@ impl SimpleFlowNode for Node {
                 }
 
                 // 7) Validate shrinkwrap entrypoint exists
-                let shrinkwrap_bin_dir = shrinkwrap_dir.join("shrinkwrap");
+                let shrinkwrap_bin_dir = shrinkwrap_src_dir.join("shrinkwrap");
                 if !shrinkwrap_bin_dir.exists() {
                     anyhow::bail!(
                         "expected shrinkwrap directory at {}, but it does not exist",
@@ -369,7 +369,7 @@ impl SimpleFlowNode for Node {
                 // 8) Print PATH guidance
                 log::info!("=== Setup Complete ===");
                 log::info!("");
-                log::info!("Shrinkwrap repo ready at: {}", shrinkwrap_dir.display());
+                log::info!("Shrinkwrap repo ready at: {}", shrinkwrap_src_dir.display());
                 log::info!("Virtual environment at: {}", venv_dir.display());
                 log::info!("ARM GNU toolchain ready at: {}", toolchain_extracted_dir.display());
                 log::info!("OHCL Linux Kernel ready at: {}", host_kernel_dir.display());

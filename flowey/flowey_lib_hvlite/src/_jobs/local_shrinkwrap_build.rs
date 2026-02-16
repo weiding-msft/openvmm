@@ -12,7 +12,7 @@ use std::thread;
 flowey_request! {
     pub struct Params {
         pub out_dir: PathBuf,
-        pub shrinkwrap_dir: PathBuf,  // Path to shrinkwrap repo (containing shrinkwrap/shrinkwrap executable)
+        pub shrinkwrap_src_dir: PathBuf,  // Path to shrinkwrap repo (containing shrinkwrap/shrinkwrap executable)
         pub platform_yaml: PathBuf,
         pub overlays: Vec<PathBuf>,
         pub btvars: Vec<String>,      // "KEY=VALUE"
@@ -30,7 +30,7 @@ impl SimpleFlowNode for Node {
     fn process_request(request: Self::Request, ctx: &mut NodeCtx<'_>) -> anyhow::Result<()> {
         let Params {
             out_dir,
-            shrinkwrap_dir,
+            shrinkwrap_src_dir,
             platform_yaml,
             overlays,
             btvars,
@@ -46,8 +46,8 @@ impl SimpleFlowNode for Node {
                 let log_path = log_dir.join("shrinkwrap-build.log");
 
                 // Build command line - use shrinkwrap wrapper script with venv activated
-                let shrinkwrap_exe = shrinkwrap_dir.join("shrinkwrap").join("shrinkwrap");
-                let venv_dir = shrinkwrap_dir.join("venv");
+                let shrinkwrap_exe = shrinkwrap_src_dir.join("shrinkwrap").join("shrinkwrap");
+                let venv_dir = shrinkwrap_src_dir.join("venv");
                 let venv_bin = venv_dir.join("bin");
 
                 let mut cmd = std::process::Command::new(&shrinkwrap_exe);
